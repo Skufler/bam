@@ -1,3 +1,4 @@
+neupy
 opencv-python
 tqdm
 scipy
