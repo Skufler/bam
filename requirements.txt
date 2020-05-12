@@ -1,7 +1,6 @@
 matplotlib
 keras
 tensorflow-gpu
-neupy
 opencv-python
 tqdm
 scipy
