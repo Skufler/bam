@@ -5,12 +5,14 @@ import numpy as np
 import pandas as pd
 import tensorflow.compat.v1 as tf
 import tensorflow as tf2
+from keras.datasets import mnist
 
 from sklearn.metrics import classification_report
 from tqdm import tqdm
 
 # Set random seed (for reproducibility)
 
+a = mnist.load_data()
 
 tf.disable_eager_execution()
 tf.disable_v2_behavior()
@@ -23,7 +25,7 @@ tf.compat.v1.set_random_seed(1000)
 width = 32
 height = 32
 batch_size = 33
-nb_epochs = 500
+nb_epochs = 400
 code_length = 1024
 use_gpu = True
 
@@ -35,21 +37,21 @@ PATH_PREFIX_3 = r'data/letters3'
 
 
 def open_image(image_path) -> np.array:
-    _image = cv2.imread(image_path, cv2.COLOR_BGR2RGB)
+    _image = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+    _image = cv2.cvtColor(_image, cv2.COLOR_BGR2GRAY)
     _image = cv2.resize(_image, (IMAGE_HEIGHT, IMAGE_WIDTH))
 
-    return np.array(_image, dtype='int16')
+    return np.array(_image, dtype='uint8')
 
 
-# Load the dataset
 dataset = pd.read_csv(r'data/letters3.csv')
 dataset.head()
 
 images_path = dataset['file']
 
-a_i = np.zeros(shape=(0, 32, 32, 3), dtype='int16')
-b_i = np.zeros(shape=(0, 32, 32, 3), dtype='int16')
-COUNT = 100
+a_i = np.zeros(shape=(0, 32, 32), dtype='uint8')
+b_i = np.zeros(shape=(0, 32, 32), dtype='uint8')
+COUNT = 20
 
 for index, path in tqdm(enumerate(images_path), total=len(images_path)):
     if int(path[3:6]) > 230 + COUNT:
@@ -75,12 +77,18 @@ for index, path in tqdm(enumerate(images_path), total=len(images_path)):
 
 np.delete(a_i, 0, axis=0)
 np.delete(b_i, 0, axis=0)
+assert len(b_i) == len(a_i)
+
+# (X_train, Y_train), (X_test, Y_test) = mnist.load_data()
 
 # Select 50 samples
+# X_source = X_train[0:50]
+#
+# X_dest = X_source.copy()
 X_train = a_i
 X_source = X_train[0:COUNT * 33]
-X_dest = X_source.copy()
-np.random.shuffle(X_dest)
+X_source = X_source[:, :, :, np.newaxis]
+b_i = b_i[:, :, :, np.newaxis]
 
 
 def encoder(encoder_input):
@@ -146,7 +154,7 @@ def create_batch(t):
     for k, image in enumerate(X_source[t:tmax]):
         X[k, :, :, :] = image / 255.0
 
-    for k, image in enumerate(X_dest[t:tmax]):
+    for k, image in enumerate(b_i[t:tmax]):
         Y[k, :, :, :] = image / 255.0
 
     return X, Y
