@@ -121,16 +121,17 @@ def decoder(code_sequence, batch_size):
         (batch_size, height - 2, width - 2, 3)
     )
 
-    deconv1 = tf.layers.conv2d_transpose(inputs=deconv_input,
-                                         filters=3,
-                                         kernel_size=(3, 3),
-                                         kernel_initializer=tf2.initializers.GlorotUniform(),
-                                         activation=tf.sigmoid)
+    deconv1 = tf.layers.conv2d_transpose(
+        inputs=deconv_input,
+        filters=3,
+        kernel_size=(3, 3),
+        kernel_initializer=tf2.initializers.GlorotUniform(),
+        activation=tf.sigmoid
+    )
 
-    # Output batch
-    output_batch = tf.cast(tf.reshape(deconv1, (batch_size, height, width, 3)) * 255.0, tf.uint8)
+    output = tf.cast(tf.reshape(deconv1, (batch_size, height, width, 3)) * 255.0, tf.uint8)
 
-    return deconv1, output_batch
+    return deconv1, output
 
 
 a_i, b_i = load_data()
@@ -257,6 +258,6 @@ if __name__ == '__main__':
         predicted = predict(restored_images[0])[0]
 
         cv2.imwrite('output/{}.jpg'.format(cnt), predicted)
-        print(compute_distances(
-            predicted.ravel(), np.unique([x.ravel() for x in b_i], axis=0))
-        )
+        # print(compute_distances(
+        #     predicted.ravel(), np.unique([x.ravel() for x in b_i], axis=0))
+        # )
