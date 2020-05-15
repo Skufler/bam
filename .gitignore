@@ -1,6 +1,7 @@
 venv/
 data/
 images/
+output/
 .idea/
 __pycache__/
 
