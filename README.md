@@ -1,4 +1,4 @@
-## Bidirectional Assocative Memory (BAM)
+## Bidirectional Associative Memory (BAM)
 * [Setup](#setup)
 * [Usage](#Usage)
 
