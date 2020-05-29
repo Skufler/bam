@@ -6,17 +6,14 @@ import tensorflow as tf2
 import tensorflow.compat.v1 as tf
 
 from tqdm import tqdm
-from scipy.spatial import distance
 
 tf.disable_eager_execution()
 tf.disable_v2_behavior()
 
-np.random.seed(1000)
-tf.compat.v1.set_random_seed(1000)
+np.random.seed(42)
+tf.compat.v1.set_random_seed(42)
 
-width = 32
-height = 32
-EPOCHS_COUNT = 300
+EPOCHS_COUNT = 500
 vector_length = 1024
 use_gpu = True
 
@@ -26,9 +23,7 @@ PATH_PREFIX_1 = r'data/letters'
 PATH_PREFIX_2 = r'data/letters2'
 PATH_PREFIX_3 = r'data/letters3'
 BATCH_SIZE = 33
-IMAGES_COUNT = 5
-
-russian_alphabet = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'
+IMAGES_COUNT = 10
 
 
 def open_image(image_path) -> np.array:
@@ -77,7 +72,7 @@ def load_data():
     return _a_i, _b_i
 
 
-def encoder(encoder_input):
+def input_layer(encoder_input):
     conv = tf.layers.conv2d(
         inputs=encoder_input,
         filters=32,
@@ -103,7 +98,7 @@ def encoder(encoder_input):
     return inputs
 
 
-def decoder(code_sequence, batch_size):
+def output_layer(code_sequence, batch_size):
     dense = tf.layers.dense(
         inputs=code_sequence,
         units=1024,
@@ -112,13 +107,13 @@ def decoder(code_sequence, batch_size):
 
     output = tf.layers.dense(
         inputs=dense,
-        units=(height - 2) * (width - 2) * 3,
+        units=(IMAGE_HEIGHT - 2) * (IMAGE_WIDTH - 2) * 3,
         activation=tf.nn.tanh
     )
 
     deconv_input = tf.reshape(
         output,
-        (batch_size, height - 2, width - 2, 3)
+        (batch_size, IMAGE_HEIGHT - 2, IMAGE_WIDTH - 2, 3)
     )
 
     deconv1 = tf.layers.conv2d_transpose(
@@ -129,7 +124,7 @@ def decoder(code_sequence, batch_size):
         activation=tf.sigmoid
     )
 
-    output = tf.cast(tf.reshape(deconv1, (batch_size, height, width, 3)) * 255.0, tf.uint8)
+    output = tf.cast(tf.reshape(deconv1, (batch_size, IMAGE_HEIGHT, IMAGE_WIDTH, 3)) * 255.0, tf.uint8)
 
     return deconv1, output
 
@@ -142,8 +137,8 @@ b_i = b_i[:, :, :, np.newaxis]
 
 
 def create_batch(index):
-    x = np.zeros((BATCH_SIZE, height, width, 3), dtype=np.float32)
-    y = np.zeros((BATCH_SIZE, height, width, 3), dtype=np.float32)
+    x = np.zeros((BATCH_SIZE, IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.float32)
+    y = np.zeros((BATCH_SIZE, IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.float32)
 
     if index < X_source.shape[0] - BATCH_SIZE:
         _batch_size = index + BATCH_SIZE
@@ -161,27 +156,12 @@ def create_batch(index):
 
 def predict(X, batch_size=1):
     feed = {
-        input_images: X.reshape((1, height, width, 3)) / 255.0,
-        output_images: np.zeros((batch_size, height, width, 3), dtype=np.float32),
+        input_images: X.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3)) / 255.0,
+        output_images: np.zeros((batch_size, IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.float32),
         t_batch_size: batch_size
     }
 
     return session.run([output_batch], feed_dict=feed)[0]
-
-
-def compute_distances(target, associations):
-    distances = distance.cdist(
-        [target],
-        np.array(
-            [[1 if x == 255 else 0 for x in y] for y in associations], dtype='uint8'
-        ),
-        'cosine'
-    )[0]
-    min_index = np.argmin(distances)
-    min_distance = distances[min_index]
-    max_similarity = 1 - min_distance
-
-    return max_similarity, russian_alphabet[min_index]
 
 
 graph = tf.Graph()
@@ -191,13 +171,13 @@ with graph.as_default():
         global_step = tf.compat.v1.Variable(0, trainable=False)
 
     with tf.device('/gpu:0' if use_gpu else '/cpu:0'):
-        input_images = tf.compat.v1.placeholder(tf.float32, shape=(None, height, width, 3))
-        output_images = tf.compat.v1.placeholder(tf.float32, shape=(None, height, width, 3))
+        input_images = tf.compat.v1.placeholder(tf.float32, shape=(None, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
+        output_images = tf.compat.v1.placeholder(tf.float32, shape=(None, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
 
         t_batch_size = tf.compat.v1.placeholder(tf.int32, shape=())
 
-        code_layer = encoder(encoder_input=input_images)
-        deconv_output, output_batch = decoder(
+        code_layer = input_layer(encoder_input=input_images)
+        deconv_output, output_batch = output_layer(
             code_sequence=code_layer,
             batch_size=t_batch_size
         )
@@ -251,13 +231,11 @@ if __name__ == '__main__':
         )
 
     cnt = 0
-    for i in range(0, (IMAGES_COUNT - 1) * 33, IMAGES_COUNT - 1):
-        restored_images = np.zeros(shape=(2, height, width, 3), dtype=np.uint8)
+    for i in tqdm(range(0, (IMAGES_COUNT - 1) * 33, IMAGES_COUNT - 1), desc='Writing images to disc'):
+        restored_images = np.zeros(shape=(2, IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.uint8)
         restored_images[0, :, :, :] = X_source[i]
 
         predicted = predict(restored_images[0])[0]
 
         cv2.imwrite('output/{}.jpg'.format(cnt), predicted)
-        # print(compute_distances(
-        #     predicted.ravel(), np.unique([x.ravel() for x in b_i], axis=0))
-        # )
+        cnt += 1
